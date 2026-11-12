@@ -1,9 +1,10 @@
-"""Vercel serverless entrypoint: exposes the Django WSGI app.
+"""Legacy Vercel entrypoint — NOT used by the current deployment.
 
-Vercel routes /api/* here (see vercel.json). The React frontend is served
-as static files from frontend/dist by Vercel itself; Django only handles
-the API in this deployment. Locally, Django can also serve the built
-frontend (see backend/config/urls.py).
+The deployment now uses Vercel Services (see vercel.json): the Django app
+in backend/ is detected from manage.py / WSGI_APPLICATION and serves
+/api/*, and the React frontend in frontend/ serves everything else.
+This file is kept only as a reference for the older single-function
+pattern; it is outside both service roots and is ignored at build time.
 """
 
 import os

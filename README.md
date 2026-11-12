@@ -50,10 +50,11 @@ weight. The app:
   two endpoints). `routing/risk.py` holds the pure risk/recommendation
   logic (unit-tested); `routing/services.py` holds the upstream API clients
   and trip computation; `routing/views.py` validates input and returns JSON.
-- **Production**: Vercel serves the built React app as static files and
-  runs Django as a Python serverless function for `/api/*`
-  (`api/index.py` + `vercel.json`). Locally, Django can also serve the
-  built frontend itself (see "Run locally").
+- **Production**: Vercel Services (see `vercel.json`): a `backend` service
+  rooted at `backend/` (Django, detected from `manage.py` and
+  `WSGI_APPLICATION`, serving `/api/*`) and a `frontend` service rooted
+  at `frontend/` (Vite build, serving everything else). Locally, Django
+  can also serve the built frontend itself (see "Run locally").
 
 ## API
 
@@ -158,12 +159,32 @@ cd backend && ../.venv/bin/python manage.py test routing
 
 ## Deployment
 
-The app is configured for Vercel (free tier, no domain purchase):
-`vercel.json` builds the React frontend and serves it statically, and
-routes `/api/*` to the Django WSGI app in `api/index.py`. Deploy by
-linking this repo to a Vercel project (or `vercel deploy` from the repo
-root); no environment variables are required. The live URL is added to
-the assessment submission once deployed.
+The app is configured for Vercel (free tier, no domain purchase) using
+[Vercel Services](https://vercel.com/docs/services), the current pattern
+for a Python backend + JavaScript frontend in one project. `vercel.json`
+declares two services:
+
+- `backend`, rooted at `backend/`: Vercel detects Django from
+  `manage.py` and the `WSGI_APPLICATION` setting, installs the
+  dependencies from `backend/requirements.txt` (kept in sync with the
+  repo-root `requirements.txt`, which local development uses), and runs
+  it as a Vercel Function with `maxDuration` 60 seconds. It receives
+  all `/api/*` requests, with the original path intact.
+- `frontend`, rooted at `frontend/`: Vite build (`npm run build`,
+  output `dist`), with an SPA fallback rewrite to `/index.html`. It
+  receives every other request.
+
+Top-level rewrites in `vercel.json` route `/api/(.*)` to the backend
+service and everything else to the frontend service. Deploy by linking
+this repo to a Vercel project (or `vercel deploy` from the repo root);
+no environment variables are required. The live URL is added to the
+assessment submission once deployed.
+
+Note: an earlier single-function layout (`api/index.py` + rewrites to
+`/api/index.py`) did not work on current Vercel — the project deployed
+as a static site and `/api/*` fell through to `index.html`, so the API
+returned HTML/405. The Services layout above replaced it; `api/index.py`
+remains in the repo only as a documented, unused reference.
 
 ## Limitations (honest)
 

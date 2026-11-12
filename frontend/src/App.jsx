@@ -142,24 +142,53 @@ export default function App() {
     setLoading(true)
     setTrip(null)
     try {
+      const departureDate = new Date(departure)
+      if (Number.isNaN(departureDate.getTime())) {
+        throw new Error('Please choose a valid departure date and time.')
+      }
       const res = await fetch('/api/routes/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           origin,
           destination,
-          departure_datetime: new Date(departure).toISOString(),
+          departure_datetime: departureDate.toISOString(),
           load_weight_lb: Number(loadWeight),
           sample_interval_miles: Number(interval),
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Request failed.')
+      // Read the body as text first: on an error the server may return
+      // HTML or an empty body, and parsing that as JSON would leak a
+      // raw browser error ("Unexpected end of JSON input") to the user.
+      const text = await res.text()
+      let data = null
+      if (text) {
+        try {
+          data = JSON.parse(text)
+        } catch {
+          data = null
+        }
+      }
+      if (!res.ok) {
+        throw new Error(
+          data?.error ||
+            `The routing service could not complete this request (HTTP ${res.status}). Please try again in a moment.`
+        )
+      }
+      if (!data || !Array.isArray(data.routes)) {
+        throw new Error('The routing service returned an unexpected response. Please try again in a moment.')
+      }
       setTrip(data)
       setSelectedRoute(data.recommended_route_id)
       setHourOffset(0)
     } catch (err) {
-      setError(err.message || 'Something went wrong.')
+      // fetch() throws a TypeError on network failures; show plain
+      // language instead of the browser's raw error text.
+      if (err instanceof TypeError) {
+        setError('Could not reach the routing service. Check your connection and try again.')
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
