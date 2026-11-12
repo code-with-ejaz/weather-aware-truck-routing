@@ -2,6 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.heat'
+// Vite does not resolve Leaflet's default marker image URLs from its CSS,
+// so the origin/destination pins render as broken images unless the URLs
+// are imported and set explicitly.
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png'
+import markerIconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png'
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIconUrl,
+  iconRetinaUrl: markerIconRetinaUrl,
+  shadowUrl: markerShadowUrl,
+})
 
 const RISK_COLORS = {
   low: '#22a06b',
@@ -121,13 +133,16 @@ export default function App() {
     L.marker([d.lat, d.lon]).addTo(layers).bindPopup(`<b>Destination</b><br/>${d.display_name}`)
 
     // Weather heatmap along the selected route's corridor, for the
-    // chosen forecast offset. Intensity = risk score (0-4) / 4.
+    // chosen forecast offset. Intensity rises with risk score (0-4), with
+    // a floor so the corridor stays faintly visible when all weather is
+    // Low (a weight of 0 renders nothing in leaflet.heat) and the slider
+    // visibly changes intensity as forecast risk rises.
     if (showHeatmap) {
       const route = trip.routes[selectedRoute]
       if (route && route.heatmap) {
         const points = route.heatmap.lats.map((lat, i) => {
           const score = route.heatmap.risk_grid[i][hourOffset] ?? 0
-          return [lat, route.heatmap.lons[i], score / 4]
+          return [lat, route.heatmap.lons[i], 0.18 + 0.82 * (score / 4)]
         })
         L.heatLayer(points, { radius: 28, blur: 20, maxZoom: 10, minOpacity: 0.25 }).addTo(layers)
       }
